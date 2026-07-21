@@ -65,7 +65,7 @@ jobs:
           PYTHONIOENCODING: utf-8
           COOKIE: ${{ secrets.ACL_COOKIE }}
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_USERID }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           PROXY: socks5://127.0.0.1:1080
         run: |
           xvfb-run -a python aclcloud-sb.py
