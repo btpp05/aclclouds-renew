@@ -138,7 +138,6 @@ class AclcloudsRenewal:
                 sb.add_cookie({
                     "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
                     "value": COOKIE,
-                    "domain": "dash.aclclouds.com",
                     "path": "/"
                 })
                 self.log("✅ 注入Cookie成功")
