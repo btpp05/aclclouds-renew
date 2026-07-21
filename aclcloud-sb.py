@@ -132,12 +132,23 @@ class AclcloudsRenewal:
                 except:
                     self.log("⚠️ IP 检测跳过...")
 
-                # 2. 访问登录首页并注入 Cookie
-                self.log("🔗 访问登录首页...")
-                sb.uc_open_with_reconnect(LOGIN_URL, reconnect_time=25)
-                self.log("🍪 注入Cookie...")
-                sb.execute_script(f"document.cookie='remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d={COOKIE}; path=/; domain=.aclclouds.com; secure; httponly'")
+                # 2. 先访问目标域名（让浏览器记住站点），再用 CDP 注入 Cookie
+                self.log("🔗 访问目标站点...")
+                sb.open("https://dash.aclclouds.com/auth/login")
+                time.sleep(3)
+                self.log("🍪 通过 CDP 注入 Cookie...")
+                # 使用 CDP 直接设置 cookie，绕过 JS 限制
+                sb.driver.execute_cdp_cmd("Network.setCookie", {
+                    "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
+                    "value": COOKIE,
+                    "domain": "dash.aclclouds.com",
+                    "path": "/",
+                    "httpOnly": True,
+                    "secure": True,
+                    "sameSite": "Lax"
+                })
                 self.log("✅ 注入Cookie成功")
+                time.sleep(2)
                 time.sleep(3)
 
                 # 3. 进入 Project 页面
