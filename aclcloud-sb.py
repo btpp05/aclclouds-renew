@@ -149,6 +149,7 @@ class AclcloudsRenewal:
                     self.log(f"⚠️ add_cookie 失败: {e}")
                     # 兜底：用 CDP
                     self.log("🔄 尝试 CDP 注入...")
+                    # 注入两个 cookie：remember_web（自动登录）+ session（兜底）
                     try:
                         sb.driver.execute_cdp_cmd("Network.setCookie", {
                             "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
@@ -164,11 +165,15 @@ class AclcloudsRenewal:
                         self.log(f"❌ CDP 也失败: {e2}")
                 time.sleep(2)
 
-                # 3. 进入 Project 页面
+                # 3. 进入 Project 页面，截图诊断
                 self.log("📂 进入Project页面")
                 sb.uc_open_with_reconnect(PROJECT_URL, reconnect_time=25)
                 time.sleep(5)
                 self.close_modal_if_present(sb)
+                # 截图发 TG 诊断
+                shot = os.path.join(self.screenshot_dir, "project_page.png")
+                sb.save_screenshot(shot)
+                self.send_telegram_notify("📸 Project page after cookie injection", photo_path=shot)
 
                 # 4. 获取服务器卡片总数
                 cards_selector = ".projects-cards-grid .client-card"
