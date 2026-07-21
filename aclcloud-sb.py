@@ -132,24 +132,37 @@ class AclcloudsRenewal:
                 except:
                     self.log("⚠️ IP 检测跳过...")
 
-                # 2. 先访问目标域名（让浏览器记住站点），再用 CDP 注入 Cookie
-                self.log("🔗 访问目标站点...")
-                sb.open("https://dash.aclclouds.com/auth/login")
+                # 2. 先打开目标域，再用 Selenium add_cookie 注入（cookie-reuse 模式）
+                self.log("🔗 打开目标站点...")
+                sb.open("https://dash.aclclouds.com")
                 time.sleep(3)
-                self.log("🍪 通过 CDP 注入 Cookie...")
-                # 使用 CDP 直接设置 cookie，绕过 JS 限制
-                sb.driver.execute_cdp_cmd("Network.setCookie", {
-                    "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
-                    "value": COOKIE,
-                    "domain": "dash.aclclouds.com",
-                    "path": "/",
-                    "httpOnly": True,
-                    "secure": True,
-                    "sameSite": "Lax"
-                })
-                self.log("✅ 注入Cookie成功")
+                self.log("🍪 注入 Cookie...")
+                try:
+                    sb.add_cookie({
+                        "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
+                        "value": COOKIE,
+                        "domain": "dash.aclclouds.com",
+                        "path": "/"
+                    })
+                    self.log("✅ 注入Cookie成功")
+                except Exception as e:
+                    self.log(f"⚠️ add_cookie 失败: {e}")
+                    # 兜底：用 CDP
+                    self.log("🔄 尝试 CDP 注入...")
+                    try:
+                        sb.driver.execute_cdp_cmd("Network.setCookie", {
+                            "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
+                            "value": COOKIE,
+                            "domain": "dash.aclclouds.com",
+                            "path": "/",
+                            "httpOnly": True,
+                            "secure": True,
+                            "sameSite": "Lax"
+                        })
+                        self.log("✅ CDP 注入成功")
+                    except Exception as e2:
+                        self.log(f"❌ CDP 也失败: {e2}")
                 time.sleep(2)
-                time.sleep(3)
 
                 # 3. 进入 Project 页面
                 self.log("📂 进入Project页面")
