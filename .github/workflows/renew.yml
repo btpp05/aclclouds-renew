@@ -30,16 +30,48 @@ jobs:
         run: |
           seleniumbase install chromedriver
 
-      - name: Launch sing-box if VLINK set
+      - name: Launch sing-box (hysteria2 proxy)
         env:
-          VLINK: ${{ secrets.KATA_LINK }}
+          KATA_LINK: ${{ secrets.KATA_LINK }}
         run: |
+          # 解析 hysteria2 链接，生成 sing-box 配置
+          LINK="$KATA_LINK"
+          WITHOUT_SCHEME="${LINK#hysteria2://}"
+          AUTH="${WITHOUT_SCHEME%%@*}"
+          REMAINDER="${WITHOUT_SCHEME#*@}"
+          HOST="${REMAINDER%%:*}"
+          PORT="${REMAINDER%%\?*}"
+          PORT="${PORT#*:}"
+          QUERY="${REMAINDER#*\?}"
+          QUERY="${QUERY%%#*}"
+          PEER="www.bing.com"
+          INSECURE="false"
+          for pair in $(echo "$QUERY" | tr '&' ' '); do
+            key="${pair%%=*}"
+            val="${pair#*=}"
+            case "$key" in
+              peer) PEER="$val" ;;
+              insecure) INSECURE="$val" ;;
+            esac
+          done
+          cat > /tmp/gen_sb.py << 'PYEOF'
+import json, sys
+auth = sys.argv[1]; host = sys.argv[2]; port = int(sys.argv[3])
+peer = sys.argv[4]; insecure = sys.argv[5].lower() == 'true'
+config = {
+    "log": {"level": "info"},
+    "inbounds": [{"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 1080, "sniff": True, "sniff_override_destination": True}],
+    "outbounds": [{"type": "hysteria2", "tag": "hysteria2-out", "server": host, "server_port": port, "password": auth, "tls": {"enabled": True, "server_name": peer, "insecure": insecure}}],
+    "route": {"final": "hysteria2-out"}
+}
+print(json.dumps(config, indent=2))
+PYEOF
+          python3 /tmp/gen_sb.py "$AUTH" "$HOST" "$PORT" "$PEER" "$INSECURE" > v.json
           curl -LO https://amd64.ssss.nyc.mn/sb
-          curl -LO https://raw.githubusercontent.com/liveqte/jupyter-notebook-deployed/refs/heads/main/vlink_to_sb.py
           chmod +x sb
-          python vlink_to_sb.py $VLINK > v.json
           nohup ./sb run -c v.json > /dev/null 2>&1 &
           sleep 3
+          echo "sing-box started"
 
       - name: Run Task (CF-Bypass Mode)
         env:
