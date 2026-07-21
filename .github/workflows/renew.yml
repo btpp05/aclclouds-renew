@@ -34,7 +34,6 @@ jobs:
         env:
           KATA_LINK: ${{ secrets.KATA_LINK }}
         run: |
-          # 解析 hysteria2 链接，生成 sing-box 配置
           LINK="$KATA_LINK"
           WITHOUT_SCHEME="${LINK#hysteria2://}"
           AUTH="${WITHOUT_SCHEME%%@*}"
@@ -54,19 +53,7 @@ jobs:
               insecure) INSECURE="$val" ;;
             esac
           done
-          cat > /tmp/gen_sb.py << 'PYEOF'
-import json, sys
-auth = sys.argv[1]; host = sys.argv[2]; port = int(sys.argv[3])
-peer = sys.argv[4]; insecure = sys.argv[5].lower() == 'true'
-config = {
-    "log": {"level": "info"},
-    "inbounds": [{"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 1080, "sniff": True, "sniff_override_destination": True}],
-    "outbounds": [{"type": "hysteria2", "tag": "hysteria2-out", "server": host, "server_port": port, "password": auth, "tls": {"enabled": True, "server_name": peer, "insecure": insecure}}],
-    "route": {"final": "hysteria2-out"}
-}
-print(json.dumps(config, indent=2))
-PYEOF
-          python3 /tmp/gen_sb.py "$AUTH" "$HOST" "$PORT" "$PEER" "$INSECURE" > v.json
+          python3 gen_sb.py "$AUTH" "$HOST" "$PORT" "$PEER" "$INSECURE" > v.json
           curl -LO https://amd64.ssss.nyc.mn/sb
           chmod +x sb
           nohup ./sb run -c v.json > /dev/null 2>&1 &
