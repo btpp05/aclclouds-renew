@@ -64,6 +64,24 @@ class AclcloudsRenewal:
         except Exception as e:
             self.log(f"❌ TG 推送失败: {e}")
 
+    def inject_cookie_via_cdp(self, sb):
+        """用 CDP 注入 cookie，绕过 Selenium add_cookie 的 invalid cookie domain bug"""
+        try:
+            sb.driver.execute_cdp_cmd("Network.setCookie", {
+                "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
+                "value": COOKIE,
+                "domain": "dash.aclclouds.com",
+                "path": "/",
+                "httpOnly": True,
+                "secure": True,
+                "sameSite": "Lax"
+            })
+            self.log("✅ CDP 注入Cookie成功")
+            return True
+        except Exception as e:
+            self.log(f"❌ CDP 注入失败: {e}")
+            return False
+
     def try_click_robot(self, sb):
         el = sb.find_element("xpath", "//*[contains(text(),'I am not a robot')]")
         rect = el.rect
@@ -127,53 +145,24 @@ class AclcloudsRenewal:
                     sb.open("https://api.ipify.org?format=json")
                     ip_val = json.loads(re.search(r'\{.*\}', sb.get_text("body")).group(0)).get('ip', 'Unknown')
                     parts = ip_val.split('.')
-                    #self.log(f"✅ 当前出口 IP: {parts[0]}.{parts[1]}.***.{parts[-1]}")
                     self.log(f"✅ 当前出口 IP: ***")
                 except:
                     self.log("⚠️ IP 检测跳过...")
 
-                # 2. 先打开目标域，再用 Selenium add_cookie 注入（cookie-reuse 模式）
+                # 2. 先打开目标域，再用 CDP 注入 cookie（绕过 add_cookie 的 domain 校验 bug）
                 self.log("🔗 打开目标站点...")
-                sb.open("https://dash.aclclouds.com")
+                sb.uc_open_with_reconnect(LOGIN_URL, reconnect_time=25)
                 time.sleep(3)
-                self.log("🍪 注入 Cookie...")
-                try:
-                    sb.add_cookie({
-                        "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
-                        "value": COOKIE,
-                        "domain": "dash.aclclouds.com",
-                        "path": "/"
-                    })
-                    self.log("✅ 注入Cookie成功")
-                except Exception as e:
-                    self.log(f"⚠️ add_cookie 失败: {e}")
-                    # 兜底：用 CDP
-                    self.log("🔄 尝试 CDP 注入...")
-                    # 注入两个 cookie：remember_web（自动登录）+ session（兜底）
-                    try:
-                        sb.driver.execute_cdp_cmd("Network.setCookie", {
-                            "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
-                            "value": COOKIE,
-                            "domain": "dash.aclclouds.com",
-                            "path": "/",
-                            "httpOnly": True,
-                            "secure": True,
-                            "sameSite": "Lax"
-                        })
-                        self.log("✅ CDP 注入成功")
-                    except Exception as e2:
-                        self.log(f"❌ CDP 也失败: {e2}")
+                self.log("🍪 通过 CDP 注入 Cookie...")
+                if not self.inject_cookie_via_cdp(sb):
+                    raise Exception("Cookie 注入失败，无法继续")
                 time.sleep(2)
 
-                # 3. 进入 Project 页面，截图诊断
+                # 3. 进入 Project 页面
                 self.log("📂 进入Project页面")
                 sb.uc_open_with_reconnect(PROJECT_URL, reconnect_time=25)
                 time.sleep(5)
                 self.close_modal_if_present(sb)
-                # 截图发 TG 诊断
-                shot = os.path.join(self.screenshot_dir, "project_page.png")
-                sb.save_screenshot(shot)
-                self.send_telegram_notify("📸 Project page after cookie injection", photo_path=shot)
 
                 # 4. 获取服务器卡片总数
                 cards_selector = ".projects-cards-grid .client-card"
@@ -197,7 +186,6 @@ class AclcloudsRenewal:
                         server_name = f"未知服务器_卡片{idx + 1}"
 
                     self.log("-" * 40)
-                    #self.log(f"🔍 [{idx + 1}/{cards_count}] 正在分析服务器: 【{server_name}】")
                     self.log(f"🔍 [{idx + 1}/{cards_count}] 正在分析服务器: x")
                     # 定义可能存在的按钮选择器
                     renew_btn = f"{card_css} button:contains('Renew')"
@@ -215,7 +203,6 @@ class AclcloudsRenewal:
 
                     # 如果既没有 Renew 也没有 Reactivate 按钮，说明当前不需要处理
                     if not (has_renew or has_reactivate):
-                        #self.log(f"ℹ️ 服务器 【{server_name}】 当前处于安全期，无需操作。状态: {time_before}")
                         self.log(f"ℹ️ 服务器x 当前处于安全期，无需操作。状态: {time_before}")
                         self.send_telegram_notify(f"ℹ️ Aclclouds 状态汇报\n🖥️ 服务器：{server_name}\n🕒 当前状态：{time_before}\n💡 提示：未触发续期窗口，无需处理。")
                         continue
