@@ -135,11 +135,8 @@ class AclcloudsRenewal:
                 # 2. 访问登录首页并注入 Cookie
                 self.log("🔗 访问登录首页...")
                 sb.uc_open_with_reconnect(LOGIN_URL, reconnect_time=25)
-                sb.add_cookie({
-                    "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
-                    "value": COOKIE,
-                    "path": "/"
-                })
+                self.log("🍪 注入Cookie...")
+                sb.execute_script(f"document.cookie='remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d={COOKIE}; path=/; domain=.aclclouds.com; secure; httponly'")
                 self.log("✅ 注入Cookie成功")
                 time.sleep(3)
 
